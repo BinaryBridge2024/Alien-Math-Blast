@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alien Math Blast</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #4a90e2, #50e3c2);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        #playerInput {
+            margin-bottom: 20px;
+        }
+
+        input[type="text"], input[type="number"] {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #f39c12;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e67e22;
+        }
+
+       
+
+        #gameControls {
+            margin-top: -20%;
+        }
+
+        #mathQuestion, #timer {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+
+        #leaderboard {
+            margin-top: 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Alien Math Blast</h1>
+    <div id="playerInput">
+        <label for="playerName">Enter your name:</label>
+        <input type="text" id="playerName" placeholder="Your name" required>
+        <button id="startGame">Start Game</button>
+    </div>
+
+    <canvas id="gameCanvas" style="display: none;"></canvas>
+    <div id="gameControls" style="display: none;">
+        <p id="playerDisplay"></p>
+        <p id="mathQuestion">Solve the math problem!</p>
+        <p id="timer">Time left: 10s</p>
+        <input type="number" id="answerInput" placeholder="Enter answer">
+        <button id="submitAnswer">Submit Answer</button>
+        <div id="leaderboard"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let playerName = '';
+        let level = 1;
+        let score = 0;
+        let lives = 3;
+        let timeLimit = 10;
+        let countdown;
+        let timerInterval;
+
+        let alienSpeed = 1;
+        let aliens = [];
+        const alienRows = 5;
+        const alienColumns = 10;
+        const alienWidth = 50;
+        const alienHeight = 50;
+        const alienPadding = 10;
+        const alienOffsetTop = 30;
+        const alienOffsetLeft = 30;
+
+        document.getElementById('startGame').addEventListener('click', () => {
+            playerName = document.getElementById('playerName').value;
+            if (playerName.trim() === '') {
+                alert('Please enter a name!');
+                return;
+            }
+
+            document.getElementById('playerDisplay').textContent = `Player: ${playerName}`;
+            document.getElementById('playerInput').style.display = 'none';
+            canvas.style.display = 'block';
+            document.getElementById('gameControls').style.display = 'block';
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            createAliens();
+            setNewQuestion();
+            update();
+        });
+
+        function createAliens() {
+            aliens = [];
+            for (let i = 0; i < alienRows; i++) {
+                aliens[i] = [];
+                for (let j = 0; j < alienColumns; j++) {
+                    const problem = generateMathProblem();
+                    aliens[i][j] = { x: 0, y: 0, status: 1, ...problem };
+                }
+            }
+        }
+
+        function generateMathProblem() {
+            const operators = ['+', '-', '*', '/'];
+            const randomOperator = operators[Math.floor(Math.random() * operators.length)];
+            const num1 = Math.floor(Math.random() * (10 * level)) + 1;
+            const num2 = Math.floor(Math.random() * (10 * level)) + 1;
+            let question, answer;
+
+            switch (randomOperator) {
+                case '+':
+                    question = `${num1} + ${num2}`;
+                    answer = num1 + num2;
+                    break;
+                case '-':
+                    question = `${num1} - ${num2}`;
+                    answer = num1 - num2;
+                    break;
+                case '*':
+                    question = `${num1} * ${num2}`;
+                    answer = num1 * num2;
+                    break;
+                case '/':
+                    const newNum1 = num1 * num2;
+                    question = `${newNum1} / ${num2}`;
+                    answer = newNum1 / num2;
+                    break;
+            }
+            return { question, answer };
+        }
+
+        function startTimer() {
+            countdown = timeLimit;
+            document.getElementById('timer').textContent = `Time left: ${countdown}s`;
+
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            timerInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('timer').textContent = `Time left: ${countdown}s`;
+                if (countdown <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Time's up! You lost a life.");
+                    lives--;
+                    if (lives <= 0) {
+                        endGame();
+                    } else {
+                        setNewQuestion();
+                    }
+                }
+            }, 1000);
+        }
+
+        const answerInput = document.getElementById('answerInput');
+        const submitAnswer = document.getElementById('submitAnswer');
+        let currentQuestion = '';
+        let currentAnswer = 0;
+
+        function getRandomAlien() {
+            let randomRow = Math.floor(Math.random() * alienRows);
+            let randomCol = Math.floor(Math.random() * alienColumns);
+            const alien = aliens[randomRow][randomCol];
+            if (alien.status === 1) {
+                return alien;
+            }
+            return getRandomAlien();
+        }
+
+        function setNewQuestion() {
+            const alien = getRandomAlien();
+            currentQuestion = alien.question;
+            currentAnswer = alien.answer;
+            document.getElementById('mathQuestion').textContent = `Solve: ${currentQuestion}`;
+            startTimer();
+        }
+
+        submitAnswer.addEventListener('click', () => {
+            const userAnswer = parseInt(answerInput.value);
+            clearInterval(timerInterval);
+
+            if (userAnswer === currentAnswer) {
+                score += 10;
+                alert('Correct! Alien destroyed.');
+                for (let i = 0; i < alienRows; i++) {
+                    for (let j = 0; j < alienColumns; j++) {
+                        if (aliens[i][j].question === currentQuestion) {
+                            aliens[i][j].status = 0;
+                        }
+                    }
+                }
+                checkLevelComplete();
+            } else {
+                alert('Wrong answer! Try again.');
+                lives--;
+                if (lives <= 0) {
+                    endGame();
+                }
+            }
+            answerInput.value = '';
+            setNewQuestion();
+        });
+
+        function checkLevelComplete() {
+            const remainingAliens = aliens.flat().filter(alien => alien.status === 1);
+            if (remainingAliens.length === 0) {
+                level++;
+                alert(`Level ${level} complete!`);
+                createAliens();
+                setNewQuestion();
+            }
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            alert(`Game Over, ${playerName}! Your final score: ${score}`);
+            resetGame();
+        }
+
+        function resetGame() {
+            level = 1;
+            score = 0;
+            lives = 3;
+            createAliens();
+            setNewQuestion();
+        }
+
+        function drawAliens() {
+            for (let i = 0; i < alienRows; i++) {
+                for (let j = 0; j < alienColumns; j++) {
+                    if (aliens[i][j].status === 1) {
+                        const alienX = j * (alienWidth + alienPadding) + alienOffsetLeft;
+                        const alienY = i * (alienHeight + alienPadding) + alienOffsetTop;
+                        aliens[i][j].x = alienX;
+                        aliens[i][j].y = alienY;
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fillRect(alienX, alienY, alienWidth, alienHeight);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '14px Arial';
+                        ctx.fillText(aliens[i][j].question, alienX + 5, alienY + 25);
+                    }
+                }
+            }
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAliens();
+            requestAnimationFrame(update);
+        }
+    </script>
+</body>
+</html>
